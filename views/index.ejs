@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Simple Group Chat on Node.js</title>
+  <style>
+    .table-show {
+      empty-cells: show;
+    }
+
+    .table-hide {
+      empty-cells: hide;
+    }
+
+    /* PRESENTATONAL STYLES */
+    body {
+      background: #333;
+      padding: 25px 0;
+      color: #fff;
+      font-family: Helvetica;
+      font-size: 3em;
+      text-align: center;
+    }
+
+    table {
+      margin: 25px auto;
+    }
+
+    td {
+      background: #fff;
+      border: 1px solid #999;
+      padding: 10px 15px;
+      color: green;
+      cursor: pointer;
+    }
+
+    td:hover {
+      background: #eaeaea;
+    }
+
+    h1 {
+      font-size: .5em;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font: 13px Helvetica, Arial;
+    }
+
+    form {
+      background: #fff;
+      padding: 3px;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      border-color: #000;
+      border-top-style: solid;
+      border-top-width: 1px;
+    }
+
+    form input {
+      border-style: solid;
+      border-width: 1px;
+      padding: 10px;
+      width: 85%;
+      margin-right: .5%;
+    }
+
+    form button {
+      width: 9%;
+      background: rgb(130, 224, 255);
+      border: none;
+      padding: 10px;
+      margin-left: 2%;
+    }
+
+    #messages {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+      color: #000
+    }
+
+    #messages li {
+      padding: 5px 10px;
+    }
+
+    #messages li:nth-child(odd) {
+      background: #eee;
+    }
+  </style>
+  <script src="../../socket.io/socket.io.js"></script>
+  <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+</head>
+
+<body>
+
+  <ul id="online"></ul>
+  <ul id="messages"></ul>
+  <table class="table-show">
+    <tbody>
+      <tr class="0">
+        <td id="0" class="0"></td>
+        <td id="1" class="1"></td>
+        <td id="2" class="2"></td>
+      </tr>
+      <tr class="1">
+        <td id="3" class="0"></td>
+        <td id="4" class="1"></td>
+        <td id="5" class="2"></td>
+      </tr>
+      <tr class="2">
+        <td id="6" class="0"></td>
+        <td id="7" class="1"></td>
+        <td id="8" class="2"></td>
+      </tr>
+    </tbody>
+  </table>
+  <form action="/" method="POST" id="chatForm">
+
+    <input type="button" value="HOST"  onclick="HostRoom()">
+
+    OR 
+
+    <input type="text" placeholder="Enter RoomID to JOIN" id="roomID">
+    <input type="button" value="JOIN" onclick="JoinRoom()" >
+
+    <input id="txt" autocomplete="off" autofocus="on" onkeyup="isTyping()"
+      placeholder="type your message here..." /><button>Send</button>
+  </form>
+  <script>
+    var board = [["A", "B", "C"], ["D", "E", "F"], ["G", "H", "I"]];
+    var mychance = true;
+    var myRoomID;
+    var IsXorO = "O" ;
+
+    $('.table-show').on('click', 'td', function () {
+       
+      if (mychance) {
+        id = this.id;
+        column = parseInt(this.className);
+        row = parseInt(this.parentNode.className);
+
+        if (IsXorO == "X") {
+
+          $(this).html("X");
+          socket.emit('inputXorO', "X", id, myRoomID,IsXorO);
+          mychance = false;
+          board[row][column] = "X";
+        } else {
+          $(this).html("O");
+          socket.emit('inputXorO', "O", id, myRoomID,IsXorO);
+          mychance = false;
+          board[row][column] = "O";
+        }
+
+        if (rowCrossed(board) || columnCrossed(board) || diagonalCrossed(board)) {
+          $('#messages').append($('<li>').html(username + "WON"));
+          socket.emit('i_won',IsXorO);
+          alert( "You WON");
+          
+        }
+      } else {
+        alert("Not Your Turn");
+      }
+    })
+
+
+    function rowCrossed(board) {
+      for (i = 0; i < 3; i++) {
+        if (board[i][0] == board[i][1] &&
+          board[i][1] == board[i][2] &&
+          board[i][0] != 'V')
+          return (true);
+      }
+      return (false);
+    }
+    function columnCrossed(board) {
+
+      for (i = 0; i < 3; i++) {
+        if (board[0][i] == board[1][i] &&
+          board[1][i] == board[2][i] &&
+          board[0][i] != 'V')
+          return (true);
+      }
+      return (false);
+    }
+    function diagonalCrossed(board) {
+      if (board[0][0] == board[1][1] &&
+        board[1][1] == board[2][2] &&
+        board[0][0] != ' ')
+        return (true);
+
+      if (board[0][2] == board[1][1] &&
+        board[1][1] == board[2][0] &&
+        board[0][2] != ' ')
+        return (true);
+
+      return (false);
+    }
+
+
+
+
+    var socket = io.connect('http://192.168.42.196:8090');
+    // submit text message without reload/refresh the page
+    $('form').submit(function (e) {
+      e.preventDefault(); // prevents page reloading
+      socket.emit('chat_message', $('#txt').val());
+      $('#txt').val('');
+      return false;
+    });
+    // append the chat text message
+    socket.on('chat_message', function (msg) {
+      $('#messages').append($('<li>').html(msg));
+    });
+    // append text if someone is online
+    socket.on('is_online', function (username) {
+      $('#messages').append($('<li>').html(username));
+    });
+
+    socket.on('input_XorO', function (data, id, raisedusername) {
+      
+      $("#" + id).html(data);
+      if (IsXorO != data)
+        mychance = true;
+    });
+
+    socket.on('is_typing', function (isTyping) {
+
+      $('#online').html(isTyping);
+    })
+
+    socket.on('otherplayerwon', function (XorO) {
+      debugger
+      if(XorO == "X" && IsXorO == "O"){
+        alert(XorO+ " Won the Game,You Lost !!");
+        $('#messages').append($('<li>').html("You LOST"));
+      }
+    })
+
+    socket.on('waitforpartner', function (roomID) {
+      myRoomID = roomID;
+      IsXorO = "X";
+      WaitForPartner();
+    })
+
+
+    socket.on('start', function (roomID) {
+      myRoomID = roomID;
+      $('#messages').append($('<li>').html("Room Joined Successfully " +roomID));
+    })
+  
+
+
+    var timeout = null;
+
+    function isTyping() {
+
+      socket.emit('typing', username, $('#txt').val());
+      // if(timeout)
+      // clearTimeout(timeout);
+      // timeout = setTimeout( socket.emit("typing", false), 5000);
+    }
+    // ask username
+
+    var username = "";
+
+
+
+    function promptUsername() {
+      username = prompt('Please tell me your name');
+      if (username == '') {
+        promptUsername();
+      } else {
+        joinChatRoom();
+      }
+    }
+   
+    function joinChatRoom(roomID) {
+      socket.emit('privatechatroom', roomID);
+    }
+
+    function StartGame(){
+        
+    }
+
+    function WaitForPartner(){
+      $('#messages').append($('<li>').html("Waiting for Someone to join the Room - " +myRoomID));
+    }
+
+
+    function JoinRoom(roomID) {
+      roomID=$("#roomID").val();
+      joinChatRoom(roomID);
+    }
+
+    function HostRoom() {
+      joinChatRoom(0);
+    }
+
+    //socket.emit('username', username);
+  </script>
+</body>
+
+</html>
